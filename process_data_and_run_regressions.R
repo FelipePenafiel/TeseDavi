@@ -10,8 +10,8 @@ library(ggplot2)
 library(tidyr)
 library(openxlsx)
 
-# Build the data
-source(file.path("R", "Merge_Table.R"))
+# Build the unified dataset
+source(file.path("R", "merge_tables.R"))
 
 # Run regression analyses
-source(file.path("R", "Regressoes_Analises.R"))
+source(file.path("R", "regression_analyses.R"))
