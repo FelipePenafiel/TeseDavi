@@ -1,8 +1,9 @@
 # Pacote fornece funções para ler dados em planilhas do Excel 
 library(readxl)
 
-# Ler arquivo 
-dados <- read_excel("C:/Pessoal/Mestrado/Regressao/correlacao/prova2.xlsx")
+# Definir diretório de dados e ler o arquivo
+raw_dir <- file.path("data", "raw")
+dados <- read_excel(file.path(raw_dir, "prova2.xlsx"))
 
 # Visualização dados
 print(dados, n=29)
