@@ -1,14 +1,8 @@
 # Main script for data processing and regression analysis
 
 # Load required libraries
-library(readxl)
-library(dplyr)
-library(writexl)
-library(MASS)
-library(car)
-library(ggplot2)
-library(tidyr)
-library(openxlsx)
+source(file.path("functions", "load_libraries.R"))
+load_libraries()
 
 # Build the unified dataset
 source(file.path("R", "merge_tables.R"))
