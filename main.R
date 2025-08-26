@@ -5,7 +5,10 @@ source(file.path("R", "functions", "load_libraries.R"))
 load_libraries()
 
 # Build the unified dataset
-source(file.path("R", "merge_tables.R"))
+source(file.path("R", "build_data.R"))
 
-# Run regression analyses
-source(file.path("R", "regression_analyses.R"))
+# Run regressions
+source(file.path("R", "perform_regressions.R"))
+
+# Explore the results
+source(file.path("R", "result_analysis.R"))
