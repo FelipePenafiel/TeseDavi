@@ -293,10 +293,10 @@ grafico_sem_outliers <- ggplot(data = dados_sem_outliers, aes(x = Age, y = AGB))
 
 grafico_comparativo <- ggplot() +
   geom_point(data = dados_floresta, aes(x = Age, y = AGB, color = "Com Outliers"), size = 2) +
-  geom_smooth(data = dados_floresta, aes(x = Age, y = AGB, color = "Com Outliers"), 
+  geom_smooth(data = dados_floresta, aes(x = Age, y = AGB, color = "Com Outliers"),
               method = "lm", se = FALSE) +
   geom_point(data = dados_sem_outliers, aes(x = Age, y = AGB, color = "Sem Outliers"), size = 2) +
-  geom_smooth(data = dados_sem_outliers, aes(x = Age, y = AGB, color = "Sem Outliers"), 
+  geom_smooth(data = dados_sem_outliers, aes(x = Age, y = AGB, color = "Sem Outliers"),
               method = "lm", se = FALSE, linetype = "dashed") +
   labs(
     title = "Comparação de Modelos de Regressão Linear Múltipla: Com e Sem Outliers",
