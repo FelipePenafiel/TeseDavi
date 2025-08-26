@@ -1,7 +1,3 @@
-library(readxl)
-library(dplyr)
-library(writexl)
-
 # Definir diretórios de dados
 raw_dir <- file.path("data", "raw")
 derived_dir <- file.path("data", "derived")

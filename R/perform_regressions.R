@@ -1,11 +1,6 @@
-# Vamos começar carregando os pacotes que vamos precisar
-library(readxl)
-library(MASS)
-library(car)
-library(ggplot2)
-library(dplyr)
-library(tidyr)
-library(openxlsx)
+#Limpar tudo
+rm(list = ls(all=TRUE))
+gc()
 
 # Definindo diretórios de dados
 raw_dir <- file.path("data", "raw")

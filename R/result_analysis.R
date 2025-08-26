@@ -1,17 +1,10 @@
-# Configuração dos diretórios de dados
-raw_dir <- file.path("data", "raw")
-derived_dir <- file.path("data", "derived")
-
 #Limpar tudo
 rm(list = ls(all=TRUE))
 gc()
 
-# Carregamento das bibliotecas necessárias
-library(lmtest)
-library(readxl)
-library(ggplot2)
-library(dplyr)
-library(tidyr)
+# Configuração dos diretórios de dados
+raw_dir <- file.path("data", "raw")
+derived_dir <- file.path("data", "derived")
 
 # Importação e preparação dos dados
 dados_floresta <- read_excel(file.path(derived_dir, "tabela_unificada.xlsx"), col_types = "text")
