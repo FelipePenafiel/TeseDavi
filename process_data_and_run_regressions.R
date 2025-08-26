@@ -1,7 +1,7 @@
 # Main script for data processing and regression analysis
 
 # Load required libraries
-source(file.path("functions", "load_libraries.R"))
+source(file.path("R", "functions", "load_libraries.R"))
 load_libraries()
 
 # Build the unified dataset
