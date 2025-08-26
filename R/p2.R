@@ -23,7 +23,7 @@ MC = lm(Y ~ X1 + X2, data=dados)
 
 # Método: Passo a passo - "Stepwise", utilizando o critério AIC (k=2)
 step(MC, direction="both", k=2, trace=1)
-step(MN, scope=list(lower=MN,upper=MC), data = mult, direction="both", k=2, trace=1)
+step(MN, scope=list(lower=MN,upper=MC), data = dados, direction="both", k=2, trace=1)
 
 # Regressão linear com modelo selecionado
 mod <- lm(Y~X1+X2)
