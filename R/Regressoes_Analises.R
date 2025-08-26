@@ -7,11 +7,12 @@ library(dplyr)
 library(tidyr)
 library(openxlsx)
 
-# Definindo o diretório de trabalho onde estão os arquivos
-setwd("C:/Users/Casa/Desktop/Davi")
+# Definindo diretórios de dados
+raw_dir <- file.path("data", "raw")
+derived_dir <- file.path("data", "derived")
 
 # Carregando os dados da planilha Excel
-forest_data <- read_excel("tabela_unificada.xlsx", col_types = "text")
+forest_data <- read_excel(file.path(derived_dir, "tabela_unificada.xlsx"), col_types = "text")
 
 # Especificando quais colunas devem ser tratadas como numéricas
 numeric_columns <- c("AGB", "Age", "Temperature", "Precipitation")
@@ -322,7 +323,7 @@ for (modelo in names(results_list)) {
 }
 
 # Exportando os resultados para um arquivo Excel
-write.xlsx(excel_data, file = "Regression_Results.xlsx", overwrite = TRUE)
+write.xlsx(excel_data, file = file.path(derived_dir, "Regression_Results.xlsx"), overwrite = TRUE)
 
 # Criando uma sequência de valores para a variável Age, cobrindo o intervalo observado
 age_seq <- seq(
@@ -470,3 +471,4 @@ for (model_name in names(results_list)) {
     }
   }
 }
+
