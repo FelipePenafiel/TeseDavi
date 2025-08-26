@@ -1,5 +1,6 @@
-# Configuração do diretório de trabalho
-setwd("C:/Pessoal - PC eco 2/Mestrado/Antonio")
+# Configuração dos diretórios de dados
+raw_dir <- file.path("data", "raw")
+derived_dir <- file.path("data", "derived")
 
 #Limpar tudo
 rm(list = ls(all=TRUE))
@@ -13,7 +14,7 @@ library(dplyr)
 library(tidyr)
 
 # Importação e preparação dos dados
-dados_floresta <- read_excel("tabela_unificada.xlsx", col_types = "text")
+dados_floresta <- read_excel(file.path(derived_dir, "tabela_unificada.xlsx"), col_types = "text")
 dados_floresta_10 <- subset(dados_floresta, Age <= 10)
 
 # Conversão de colunas para valores numéricos
@@ -175,7 +176,7 @@ print(grafico_sem_outliers)
 print(grafico_comparativo)
 
 # Salvamento dos Dados Ajustados e do Modelo
-write.csv(dados_sem_outliers, "dados_sem_outliers.csv")
+write.csv(dados_sem_outliers, file.path(derived_dir, "dados_sem_outliers.csv"))
 
 
 ############################
@@ -312,7 +313,7 @@ print(grafico_sem_outliers)
 print(grafico_comparativo)
 
 # Salvamento dos Dados Ajustados e do Modelo Final
-write.csv(dados_sem_outliers, "modelo_linear_multiplo_dados_sem_outliers.csv")
+write.csv(dados_sem_outliers, file.path(derived_dir, "modelo_linear_multiplo_dados_sem_outliers.csv"))
 
 
 
@@ -460,7 +461,7 @@ print(grafico_sem_outliers)
 print(grafico_comparativo)
 
 # Salvamento dos dados e modelos
-write.csv(dados_sem_outliers, "dados_sem_outliers_schnute.csv")
+write.csv(dados_sem_outliers, file.path(derived_dir, "dados_sem_outliers_schnute.csv"))
 
 
 ############################
@@ -588,7 +589,7 @@ grafico_comparativo <- ggplot() +
 print(grafico_comparativo)
 
 # Salvamento dos dados ajustados e dos modelos
-write.csv(dados_sem_outliers, "dados_sem_outliers_gompertz.csv")
+write.csv(dados_sem_outliers, file.path(derived_dir, "dados_sem_outliers_gompertz.csv"))
 
 # Sequência de valores para prever
 age_grid <- seq(min(dados_floresta$Age, na.rm = TRUE), max(dados_floresta$Age, na.rm = TRUE), length.out = 100)
@@ -652,3 +653,4 @@ plot_combinado <- ggplot(dados_floresta, aes(x = Age, y = AGB)) +
 
 # Exibir o gráfico
 print(plot_combinado)
+
