@@ -8,6 +8,7 @@ derived_dir <- file.path("data", "derived")
 
 # Importação e preparação dos dados
 source("R/functions/load_and_prepare_data.R")
+source("R/functions/regression_utils.R")
 dados_floresta <- load_and_prepare_data(file.path(raw_dir, "tabela_unificada.xlsx"))
 dados_floresta_10 <- subset(dados_floresta, Age <= 10)
 
@@ -16,12 +17,14 @@ dados_floresta_10 <- subset(dados_floresta, Age <= 10)
 ############################
 
 # Ajuste inicial do modelo de regressão linear simples
-modelo_linear_simples <- lm(AGB ~ Age, data = dados_floresta)
+linear_result <- run_regression_analysis(dados_floresta, AGB ~ Age, "Linear_Initial")
+modelo_linear_simples <- linear_result$model
 
 # Cálculo dos indicadores do modelo inicial (com outliers)
-r2_original <- summary(modelo_linear_simples)$r.squared
-r2_ajustado_original <- summary(modelo_linear_simples)$adj.r.squared
-aic_original <- AIC(modelo_linear_simples)
+metrics_linear_inicial <- calculate_model_metrics(modelo_linear_simples, dados_floresta, "Linear")
+r2_original <- metrics_linear_inicial$R_squared
+r2_ajustado_original <- metrics_linear_inicial$Adjusted_R_squared
+aic_original <- metrics_linear_inicial$AIC
 
 cat("Indicadores do Modelo de Regressão Linear Simples (Com Outliers):\n")
 cat("Coeficiente de Determinação (R²): ", r2_original, "\n")
@@ -43,12 +46,12 @@ shapiro.test(dados_floresta$AGB)
 
 # Diagnóstico de Outliers com base nos critérios estatísticos
 # 1. Distância de Cook - como se fosse resíduos padronizados, mas critério de seleção outro
-distancia_cook <- cooks.distance(modelo_linear_simples)
+distancia_cook <- linear_result$diagnostics$cooksd
 limiar_cook <- 4 / (nrow(dados_floresta) - length(coef(modelo_linear_simples)))
 outliers_cook <- which(distancia_cook > limiar_cook)
 
 # 2. Alavancagem (Leverage)
-valores_hat <- hatvalues(modelo_linear_simples)
+valores_hat <- linear_result$diagnostics$hat_values
 limiar_leverage <- 2 * mean(valores_hat)
 outliers_leverage <- which(valores_hat > limiar_leverage)
 
@@ -80,12 +83,14 @@ dados_floresta[outliers_identificados, ]
 dados_sem_outliers <- dados_floresta[-outliers_identificados, ]
 
 # Reajuste do Modelo de Regressão Linear após Remoção de Outliers
-modelo_linear_simples_ajustado <- lm(AGB ~ Age, data = dados_sem_outliers)
+linear_adjusted <- run_regression_analysis(dados_sem_outliers, AGB ~ Age, "Linear_Adjusted")
+modelo_linear_simples_ajustado <- linear_adjusted$model
 
 # Indicadores do Modelo Ajustado (Sem Outliers)
-r2_ajustado <- summary(modelo_linear_simples_ajustado)$r.squared
-r2_ajustado_sem_outliers <- summary(modelo_linear_simples_ajustado)$adj.r.squared
-aic_sem_outliers <- AIC(modelo_linear_simples_ajustado)
+metrics_linear_ajustado <- calculate_model_metrics(modelo_linear_simples_ajustado, dados_sem_outliers, "Linear")
+r2_ajustado <- metrics_linear_ajustado$R_squared
+r2_ajustado_sem_outliers <- metrics_linear_ajustado$Adjusted_R_squared
+aic_sem_outliers <- metrics_linear_ajustado$AIC
 
 cat("Indicadores do Modelo de Regressão Linear Simples (Sem Outliers):\n")
 cat("Coeficiente de Determinação (R²): ", r2_ajustado, "\n")
@@ -168,7 +173,8 @@ write.csv(dados_sem_outliers, file.path(derived_dir, "dados_sem_outliers.csv"))
 # REGRESSÃO LINEAR MÚLTIPLA
 ############################
 # Ajuste inicial do modelo de regressão linear múltipla
-modelo_linear_multiplo <- lm(AGB ~ Age + Temperature + Precipitation, data = dados_floresta)
+multiplo_result <- run_regression_analysis(dados_floresta, AGB ~ Age + Temperature + Precipitation, "Multipla_Initial")
+modelo_linear_multiplo <- multiplo_result$model
 
 #Stepwise
 stepwise <- step(
@@ -179,9 +185,10 @@ stepwise <- step(
 summary(stepwise)
 
 # Avaliação do modelo inicial (com outliers)
-r2_original <- summary(modelo_linear_multiplo)$r.squared
-r2_ajustado_original <- summary(modelo_linear_multiplo)$adj.r.squared
-aic_original <- AIC(modelo_linear_multiplo)
+metrics_multiplo_inicial <- calculate_model_metrics(modelo_linear_multiplo, dados_floresta, "Multipla")
+r2_original <- metrics_multiplo_inicial$R_squared
+r2_ajustado_original <- metrics_multiplo_inicial$Adjusted_R_squared
+aic_original <- metrics_multiplo_inicial$AIC
 
 cat("Indicadores do Modelo de Regressão Linear Múltipla (Com Outliers):\n")
 cat("Coeficiente de Determinação (R²): ", r2_original, "\n")
@@ -195,12 +202,12 @@ par(mfrow = c(1, 1))
 
 # Diagnóstico de Outliers no Modelo de Regressão
 # 1. Identificação com base na Distância de Cook
-distancia_cook <- cooks.distance(modelo_linear_multiplo)
+distancia_cook <- multiplo_result$diagnostics$cooksd
 limiar_cook <- 4 / (nrow(dados_floresta) - length(coef(modelo_linear_multiplo)))
 outliers_cook <- which(distancia_cook > limiar_cook)
 
 # 2. Identificação com base na Alavancagem (Leverage)
-valores_hat <- hatvalues(modelo_linear_multiplo)
+valores_hat <- multiplo_result$diagnostics$hat_values
 limiar_leverage <- 2 * mean(valores_hat)
 outliers_leverage <- which(valores_hat > limiar_leverage)
 
@@ -231,12 +238,14 @@ dados_floresta[outliers_identificados, ]
 dados_sem_outliers <- dados_floresta[-outliers_identificados, ]
 
 # Reajuste do Modelo de Regressão Linear Múltipla após Remoção de Outliers
-modelo_linear_multiplo_ajustado <- lm(AGB ~ Age + Temperature + Precipitation, data = dados_sem_outliers)
+multiplo_adjusted <- run_regression_analysis(dados_sem_outliers, AGB ~ Age + Temperature + Precipitation, "Multipla_Adjusted")
+modelo_linear_multiplo_ajustado <- multiplo_adjusted$model
 
 # Avaliação do Modelo Ajustado (Sem Outliers)
-r2_ajustado <- summary(modelo_linear_multiplo_ajustado)$r.squared
-r2_ajustado_sem_outliers <- summary(modelo_linear_multiplo_ajustado)$adj.r.squared
-aic_sem_outliers <- AIC(modelo_linear_multiplo_ajustado)
+metrics_multiplo_ajustado <- calculate_model_metrics(modelo_linear_multiplo_ajustado, dados_sem_outliers, "Multipla")
+r2_ajustado <- metrics_multiplo_ajustado$R_squared
+r2_ajustado_sem_outliers <- metrics_multiplo_ajustado$Adjusted_R_squared
+aic_sem_outliers <- metrics_multiplo_ajustado$AIC
 
 cat("Indicadores do Modelo Ajustado (Sem Outliers):\n")
 cat("Coeficiente de Determinação (R²): ", r2_ajustado, "\n")
