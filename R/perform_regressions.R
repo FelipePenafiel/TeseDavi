@@ -6,19 +6,9 @@ gc()
 raw_dir <- file.path("data", "raw")
 derived_dir <- file.path("data", "derived")
 
-# Carregando os dados da planilha Excel
-forest_data <- read_excel(file.path(raw_dir, "tabela_unificada.xlsx"), col_types = "text")
-
-# Especificando quais colunas devem ser tratadas como numéricas
-numeric_columns <- c("AGB", "Age", "Temperature", "Precipitation")
-
-# Convertendo vírgulas para pontos e transformando as colunas em números
-forest_data[numeric_columns] <- lapply(forest_data[numeric_columns], function(x) {
-  as.numeric(gsub(",", ".", x))
-})
-
-# Substituindo valores -9999 por NA para lidar com dados faltantes
-forest_data[forest_data == -9999] <- NA
+# Carregando os dados usando a função utilitária
+source("R/functions/load_and_prepare_data.R")
+forest_data <- load_and_prepare_data(file.path(raw_dir, "tabela_unificada.xlsx"))
 
 # Função para realizar a análise de regressão
 run_regression_analysis <- function(data, formula, model_name) {
