@@ -62,7 +62,7 @@ run_regression_analysis <- function(data, formula, model_name) {
   if (model_type %in% c("Linear", "Multipla")) {
     # Verificando possíveis outliers usando o teste de Bonferroni
     diagnostics$outlier_test <- tryCatch(
-      outlierTest(model),
+      car::outlierTest(model),
       error = function(e) {
         message("Erro no teste de outliers para ", model_name, ": ", e$message)
         return(NULL)
