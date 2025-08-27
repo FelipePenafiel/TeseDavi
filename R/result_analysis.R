@@ -14,7 +14,7 @@ derived_dir <- file.path("data", "derived")
 # Importação e preparação dos dados
 source("R/functions/load_and_prepare_data.R")
 source("R/functions/regression_utils.R")
-dados_floresta <- load_and_prepare_data(file.path(derived_dir, "tabela_unificada.xlsx"))
+dados_floresta <- load_and_prepare_data(file.path(raw_dir, "tabela_unificada.xlsx"))
 dados_floresta_10 <- subset(dados_floresta, Age <= 10)
 
 ############################
@@ -94,6 +94,7 @@ modelo_linear_simples_ajustado <- linear_adjusted$model
 
 # Indicadores do Modelo Ajustado (Sem Outliers)
 metrics_linear_ajustado <- calculate_model_metrics(modelo_linear_simples_ajustado, dados_linear_sem_outliers, "Linear")
+
 r2_ajustado <- metrics_linear_ajustado$R_squared
 r2_ajustado_sem_outliers <- metrics_linear_ajustado$Adjusted_R_squared
 aic_sem_outliers <- metrics_linear_ajustado$AIC
@@ -244,11 +245,11 @@ dados_floresta[outliers_identificados, ]
 dados_multiplo_sem_outliers <- dados_floresta[-outliers_identificados, ]
 
 # Reajuste do Modelo de Regressão Linear Múltipla após Remoção de Outliers
-multiplo_adjusted <- run_regression_analysis(dados_multiplo_sem_outliers, AGB ~ Age + Temperature + Precipitation, "Multipla_Adjusted")
+multiplo_adjusted <- run_regression_analysis(dados_sem_outliers, AGB ~ Age + Temperature + Precipitation, "Multipla_Adjusted")
 modelo_linear_multiplo_ajustado <- multiplo_adjusted$model
 
 # Avaliação do Modelo Ajustado (Sem Outliers)
-metrics_multiplo_ajustado <- calculate_model_metrics(modelo_linear_multiplo_ajustado, dados_multiplo_sem_outliers, "Multipla")
+metrics_multiplo_ajustado <- calculate_model_metrics(modelo_linear_multiplo_ajustado, dados_sem_outliers, "Multipla")
 r2_ajustado <- metrics_multiplo_ajustado$R_squared
 r2_ajustado_sem_outliers <- metrics_multiplo_ajustado$Adjusted_R_squared
 aic_sem_outliers <- metrics_multiplo_ajustado$AIC
