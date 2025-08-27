@@ -8,7 +8,7 @@ derived_dir <- file.path("data", "derived")
 
 # Importação e preparação dos dados
 source("R/functions/load_and_prepare_data.R")
-dados_floresta <- load_and_prepare_data(file.path(derived_dir, "tabela_unificada.xlsx"))
+dados_floresta <- load_and_prepare_data(file.path(raw_dir, "tabela_unificada.xlsx"))
 dados_floresta_10 <- subset(dados_floresta, Age <= 10)
 
 ############################
