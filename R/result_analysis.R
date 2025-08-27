@@ -2,12 +2,18 @@
 rm(list = ls(all=TRUE))
 gc()
 
+# Carregamento de pacotes necessários
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+
 # Configuração dos diretórios de dados
 raw_dir <- file.path("data", "raw")
 derived_dir <- file.path("data", "derived")
 
 # Importação e preparação dos dados
 source("R/functions/load_and_prepare_data.R")
+source("R/functions/regression_utils.R")
 dados_floresta <- load_and_prepare_data(file.path(derived_dir, "tabela_unificada.xlsx"))
 dados_floresta_10 <- subset(dados_floresta, Age <= 10)
 
@@ -16,12 +22,14 @@ dados_floresta_10 <- subset(dados_floresta, Age <= 10)
 ############################
 
 # Ajuste inicial do modelo de regressão linear simples
-modelo_linear_simples <- lm(AGB ~ Age, data = dados_floresta)
+linear_result <- run_regression_analysis(dados_floresta, AGB ~ Age, "Linear_Initial")
+modelo_linear_simples <- linear_result$model
 
 # Cálculo dos indicadores do modelo inicial (com outliers)
-r2_original <- summary(modelo_linear_simples)$r.squared
-r2_ajustado_original <- summary(modelo_linear_simples)$adj.r.squared
-aic_original <- AIC(modelo_linear_simples)
+metrics_linear_inicial <- calculate_model_metrics(modelo_linear_simples, dados_floresta, "Linear")
+r2_original <- metrics_linear_inicial$R_squared
+r2_ajustado_original <- metrics_linear_inicial$Adjusted_R_squared
+aic_original <- metrics_linear_inicial$AIC
 
 cat("Indicadores do Modelo de Regressão Linear Simples (Com Outliers):\n")
 cat("Coeficiente de Determinação (R²): ", r2_original, "\n")
@@ -43,12 +51,12 @@ shapiro.test(dados_floresta$AGB)
 
 # Diagnóstico de Outliers com base nos critérios estatísticos
 # 1. Distância de Cook - como se fosse resíduos padronizados, mas critério de seleção outro
-distancia_cook <- cooks.distance(modelo_linear_simples)
+distancia_cook <- linear_result$diagnostics$cooksd
 limiar_cook <- 4 / (nrow(dados_floresta) - length(coef(modelo_linear_simples)))
 outliers_cook <- which(distancia_cook > limiar_cook)
 
 # 2. Alavancagem (Leverage)
-valores_hat <- hatvalues(modelo_linear_simples)
+valores_hat <- linear_result$diagnostics$hat_values
 limiar_leverage <- 2 * mean(valores_hat)
 outliers_leverage <- which(valores_hat > limiar_leverage)
 
@@ -78,14 +86,17 @@ dados_floresta[outliers_bonferroni,]
 # Remoção de Outliers Identificados
 dados_floresta[outliers_identificados, ]
 dados_sem_outliers <- dados_floresta[-outliers_identificados, ]
+dados_linear_sem_outliers <- dados_sem_outliers
 
 # Reajuste do Modelo de Regressão Linear após Remoção de Outliers
-modelo_linear_simples_ajustado <- lm(AGB ~ Age, data = dados_sem_outliers)
+linear_adjusted <- run_regression_analysis(dados_linear_sem_outliers, AGB ~ Age, "Linear_Adjusted")
+modelo_linear_simples_ajustado <- linear_adjusted$model
 
 # Indicadores do Modelo Ajustado (Sem Outliers)
-r2_ajustado <- summary(modelo_linear_simples_ajustado)$r.squared
-r2_ajustado_sem_outliers <- summary(modelo_linear_simples_ajustado)$adj.r.squared
-aic_sem_outliers <- AIC(modelo_linear_simples_ajustado)
+metrics_linear_ajustado <- calculate_model_metrics(modelo_linear_simples_ajustado, dados_linear_sem_outliers, "Linear")
+r2_ajustado <- metrics_linear_ajustado$R_squared
+r2_ajustado_sem_outliers <- metrics_linear_ajustado$Adjusted_R_squared
+aic_sem_outliers <- metrics_linear_ajustado$AIC
 
 cat("Indicadores do Modelo de Regressão Linear Simples (Sem Outliers):\n")
 cat("Coeficiente de Determinação (R²): ", r2_ajustado, "\n")
@@ -107,11 +118,11 @@ par(mfrow = c(1, 1))
 
 # Teste de Breusch-Pagan & Shapiro-Wilk
 bptest(modelo_linear_simples_ajustado)
-shapiro.test(dados_sem_outliers$AGB)
+shapiro.test(dados_linear_sem_outliers$AGB)
 
 # Visualização: Comparação entre os Dados Originais e Sem Outliers
 dados_floresta$Dataset <- "Com Outliers"
-dados_sem_outliers$Dataset <- "Sem Outliers"
+dados_linear_sem_outliers$Dataset <- "Sem Outliers"
 
 grafico_com_outliers <- ggplot(data = dados_floresta, aes(x = Age, y = AGB)) +
   geom_point(color = "blue", size = 2) +
@@ -123,7 +134,7 @@ grafico_com_outliers <- ggplot(data = dados_floresta, aes(x = Age, y = AGB)) +
   ) +
   theme_minimal()
 
-grafico_sem_outliers <- ggplot(data = dados_sem_outliers, aes(x = Age, y = AGB)) +
+grafico_sem_outliers <- ggplot(data = dados_linear_sem_outliers, aes(x = Age, y = AGB)) +
   geom_point(color = "green", size = 2) +
   geom_smooth(method = "lm", color = "black", se = FALSE) +
   labs(
@@ -136,9 +147,9 @@ grafico_sem_outliers <- ggplot(data = dados_sem_outliers, aes(x = Age, y = AGB))
 
 # Gráfico comparativo
 dados_floresta$Conjunto <- "Com Outliers"
-dados_sem_outliers$Conjunto <- "Sem Outliers"
+dados_linear_sem_outliers$Conjunto <- "Sem Outliers"
 
-dados_combined <- rbind(dados_floresta, dados_sem_outliers)
+dados_combined <- rbind(dados_floresta, dados_linear_sem_outliers)
 
 grafico_comparativo <- ggplot(data = dados_combined, aes(x = Age, y = AGB, color = Conjunto)) +
   # Plotar os pontos dos dados
@@ -161,14 +172,15 @@ print(grafico_sem_outliers)
 print(grafico_comparativo)
 
 # Salvamento dos Dados Ajustados e do Modelo
-write.csv(dados_sem_outliers, file.path(derived_dir, "dados_sem_outliers.csv"))
+write.csv(dados_linear_sem_outliers, file.path(derived_dir, "dados_sem_outliers.csv"))
 
 
 ############################
 # REGRESSÃO LINEAR MÚLTIPLA
 ############################
 # Ajuste inicial do modelo de regressão linear múltipla
-modelo_linear_multiplo <- lm(AGB ~ Age + Temperature + Precipitation, data = dados_floresta)
+multiplo_result <- run_regression_analysis(dados_floresta, AGB ~ Age + Temperature + Precipitation, "Multipla_Initial")
+modelo_linear_multiplo <- multiplo_result$model
 
 #Stepwise
 stepwise <- step(
@@ -179,9 +191,10 @@ stepwise <- step(
 summary(stepwise)
 
 # Avaliação do modelo inicial (com outliers)
-r2_original <- summary(modelo_linear_multiplo)$r.squared
-r2_ajustado_original <- summary(modelo_linear_multiplo)$adj.r.squared
-aic_original <- AIC(modelo_linear_multiplo)
+metrics_multiplo_inicial <- calculate_model_metrics(modelo_linear_multiplo, dados_floresta, "Multipla")
+r2_original <- metrics_multiplo_inicial$R_squared
+r2_ajustado_original <- metrics_multiplo_inicial$Adjusted_R_squared
+aic_original <- metrics_multiplo_inicial$AIC
 
 cat("Indicadores do Modelo de Regressão Linear Múltipla (Com Outliers):\n")
 cat("Coeficiente de Determinação (R²): ", r2_original, "\n")
@@ -195,12 +208,12 @@ par(mfrow = c(1, 1))
 
 # Diagnóstico de Outliers no Modelo de Regressão
 # 1. Identificação com base na Distância de Cook
-distancia_cook <- cooks.distance(modelo_linear_multiplo)
+distancia_cook <- multiplo_result$diagnostics$cooksd
 limiar_cook <- 4 / (nrow(dados_floresta) - length(coef(modelo_linear_multiplo)))
 outliers_cook <- which(distancia_cook > limiar_cook)
 
 # 2. Identificação com base na Alavancagem (Leverage)
-valores_hat <- hatvalues(modelo_linear_multiplo)
+valores_hat <- multiplo_result$diagnostics$hat_values
 limiar_leverage <- 2 * mean(valores_hat)
 outliers_leverage <- which(valores_hat > limiar_leverage)
 
@@ -228,15 +241,17 @@ print(outliers_identificados)
 
 # Remoção de Outliers Identificados do Conjunto de Dados
 dados_floresta[outliers_identificados, ]
-dados_sem_outliers <- dados_floresta[-outliers_identificados, ]
+dados_multiplo_sem_outliers <- dados_floresta[-outliers_identificados, ]
 
 # Reajuste do Modelo de Regressão Linear Múltipla após Remoção de Outliers
-modelo_linear_multiplo_ajustado <- lm(AGB ~ Age + Temperature + Precipitation, data = dados_sem_outliers)
+multiplo_adjusted <- run_regression_analysis(dados_multiplo_sem_outliers, AGB ~ Age + Temperature + Precipitation, "Multipla_Adjusted")
+modelo_linear_multiplo_ajustado <- multiplo_adjusted$model
 
 # Avaliação do Modelo Ajustado (Sem Outliers)
-r2_ajustado <- summary(modelo_linear_multiplo_ajustado)$r.squared
-r2_ajustado_sem_outliers <- summary(modelo_linear_multiplo_ajustado)$adj.r.squared
-aic_sem_outliers <- AIC(modelo_linear_multiplo_ajustado)
+metrics_multiplo_ajustado <- calculate_model_metrics(modelo_linear_multiplo_ajustado, dados_multiplo_sem_outliers, "Multipla")
+r2_ajustado <- metrics_multiplo_ajustado$R_squared
+r2_ajustado_sem_outliers <- metrics_multiplo_ajustado$Adjusted_R_squared
+aic_sem_outliers <- metrics_multiplo_ajustado$AIC
 
 cat("Indicadores do Modelo Ajustado (Sem Outliers):\n")
 cat("Coeficiente de Determinação (R²): ", r2_ajustado, "\n")
@@ -254,7 +269,7 @@ par(mfrow = c(1, 1))
 
 # Visualização Comparativa dos Dados com e sem Outliers
 dados_floresta$Dataset <- "Com Outliers"
-dados_sem_outliers$Dataset <- "Sem Outliers"
+dados_multiplo_sem_outliers$Dataset <- "Sem Outliers"
 
 grafico_com_outliers <- ggplot(data = dados_floresta, aes(x = Age, y = AGB)) +
   geom_point(color = "blue", size = 2) +
@@ -266,7 +281,7 @@ grafico_com_outliers <- ggplot(data = dados_floresta, aes(x = Age, y = AGB)) +
   ) +
   theme_minimal()
 
-grafico_sem_outliers <- ggplot(data = dados_sem_outliers, aes(x = Age, y = AGB)) +
+grafico_sem_outliers <- ggplot(data = dados_multiplo_sem_outliers, aes(x = Age, y = AGB)) +
   geom_point(color = "green", size = 2) +
   geom_smooth(method = "lm", color = "green", se = FALSE) +
   labs(
@@ -280,8 +295,8 @@ grafico_comparativo <- ggplot() +
   geom_point(data = dados_floresta, aes(x = Age, y = AGB, color = "Com Outliers"), size = 2) +
   geom_smooth(data = dados_floresta, aes(x = Age, y = AGB, color = "Com Outliers"),
               method = "lm", se = FALSE) +
-  geom_point(data = dados_sem_outliers, aes(x = Age, y = AGB, color = "Sem Outliers"), size = 2) +
-  geom_smooth(data = dados_sem_outliers, aes(x = Age, y = AGB, color = "Sem Outliers"),
+  geom_point(data = dados_multiplo_sem_outliers, aes(x = Age, y = AGB, color = "Sem Outliers"), size = 2) +
+  geom_smooth(data = dados_multiplo_sem_outliers, aes(x = Age, y = AGB, color = "Sem Outliers"),
               method = "lm", se = FALSE, linetype = "dashed") +
   labs(
     title = "Comparação de Modelos de Regressão Linear Múltipla: Com e Sem Outliers",
@@ -298,7 +313,7 @@ print(grafico_sem_outliers)
 print(grafico_comparativo)
 
 # Salvamento dos Dados Ajustados e do Modelo Final
-write.csv(dados_sem_outliers, file.path(derived_dir, "modelo_linear_multiplo_dados_sem_outliers.csv"))
+write.csv(dados_multiplo_sem_outliers, file.path(derived_dir, "modelo_linear_multiplo_dados_sem_outliers.csv"))
 
 
 
@@ -307,103 +322,56 @@ write.csv(dados_sem_outliers, file.path(derived_dir, "modelo_linear_multiplo_dad
 ############################
 
 # Ajuste inicial do modelo Schnute
-# Este modelo é utilizado para ajustar a relação não-linear entre AGB e Age.
-Schnute <- nls(
-  AGB ~ (BETA * (1 - exp(-A * Age))) ^ THETA,
-  data = dados_floresta,
-  start = list(BETA = 9.2, A = 0.19, THETA = 2.9),
-  algorithm = "port"
-)
+schnute_result <- run_regression_analysis(dados_floresta, AGB ~ Age, "Schnute_Initial")
+modelo_schnute <- schnute_result$model
 
-# Cálculo do coeficiente de determinação (R²) para o modelo ajustado
-predicoes <- predict(Schnute, newdata = dados_floresta)
-residuos <- dados_floresta$AGB - predicoes
-soma_quadrados_residuos <- sum(residuos^2, na.rm = TRUE)
-soma_quadrados_total <- sum((dados_floresta$AGB - mean(dados_floresta$AGB, na.rm = TRUE))^2, na.rm = TRUE)
-r2_original <- 1 - (soma_quadrados_residuos / soma_quadrados_total)
+# Indicadores do modelo inicial (com outliers)
+metrics_schnute_inicial <- calculate_model_metrics(modelo_schnute, dados_floresta, "Schnute")
+r2_original <- metrics_schnute_inicial$R_squared
+r2_ajustado_original <- metrics_schnute_inicial$Adjusted_R_squared
+aic_original <- metrics_schnute_inicial$AIC
 
 cat("Indicadores do Modelo Schnute (Com Outliers):\n")
 cat("Coeficiente de Determinação (R²): ", r2_original, "\n")
-
-# Cálculo do coeficiente de determinação ajustado (R² Ajustado)
-n <- nrow(dados_floresta)
-p <- length(coef(Schnute))
-r2_ajustado_original <- 1 - (1 - r2_original) * (n - 1) / (n - p - 1)
 cat("Coeficiente de Determinação Ajustado (R² Ajustado): ", r2_ajustado_original, "\n")
-
-# Cálculo do Critério de Informação de Akaike (AIC) para o modelo
-aic_original <- AIC(Schnute)
 cat("Critério de Informação de Akaike (AIC): ", aic_original, "\n\n")
 
-# Cálculo do RMSE (Root Mean Square Error)
-rmse <- sqrt(mean(residuals(Schnute)^2))
+# Cálculo do RMSE
+rmse <- sqrt(mean(residuals(modelo_schnute)^2))
 cat("Root Mean Square Error (RMSE): ", rmse, "\n")
 
-# Gráficos diagnósticos do modelo Schnute
-par(mfrow = c(2, 2))
-plot(Schnute)
-par(mfrow = c(1, 1))
-
-# Identificação de outliers baseada nos resíduos padronizados
-residuos_padronizados <- residuos / sd(residuos, na.rm = TRUE)
-outliers_identificados <- which(abs(residuos_padronizados) > 2)
-
+# Identificação de outliers
+outliers_identificados <- schnute_result$diagnostics$possible_outliers
 cat("Índices dos Outliers Identificados:\n")
 print(outliers_identificados)
-
 cat("Dados Correspondentes aos Outliers Identificados:\n")
 print(dados_floresta[outliers_identificados, ])
 
-# Gráfico dos resíduos padronizados para visualização de outliers
-par(mfrow = c(1, 1))
-plot(
-  residuos_padronizados,
-  main = "Resíduos Padronizados",
-  xlab = "Índice",
-  ylab = "Resíduo Padronizado",
-  pch = 1,
-  col = "blue"
-)
-abline(h = c(-2, 2), col = "red", lty = 2)  # Limites de outliers (-2 e 2)
+# Remoção dos outliers e ajuste do modelo
+dados_schnute_sem_outliers <- dados_floresta
+if (length(outliers_identificados) > 0) {
+  dados_schnute_sem_outliers <- dados_floresta[-outliers_identificados, ]
+}
+schnute_adjusted <- run_regression_analysis(dados_schnute_sem_outliers, AGB ~ Age, "Schnute_Adjusted")
+modelo_schnute_ajustado <- schnute_adjusted$model
 
-
-# Remoção dos outliers e ajuste do modelo Schnute
-dados_sem_outliers <- dados_floresta[-outliers_identificados, ]
-
-Schnute_ajustado <- nls(
-  AGB ~ (BETA * (1 - exp(-A * Age))) ^ THETA,
-  data = dados_sem_outliers,
-  start = list(BETA = 9.2, A = 0.19, THETA = 2.9),
-  algorithm = "port"
-)
-
-# Recalcular os indicadores do modelo ajustado (Sem Outliers)
-predicoes_sem_outliers <- predict(Schnute_ajustado, newdata = dados_sem_outliers)
-residuos_sem_outliers <- dados_sem_outliers$AGB - predicoes_sem_outliers
-soma_quadrados_residuos_sem_outliers <- sum(residuos_sem_outliers^2, na.rm = TRUE)
-soma_quadrados_total_sem_outliers <- sum((dados_sem_outliers$AGB - mean(dados_sem_outliers$AGB, na.rm = TRUE))^2, na.rm = TRUE)
-r2_sem_outliers <- 1 - (soma_quadrados_residuos_sem_outliers / soma_quadrados_total_sem_outliers)
-
-# Cálculo do R² Ajustado para o modelo sem outliers
-n_sem_outliers <- nrow(dados_sem_outliers)
-p_sem_outliers <- length(coef(Schnute_ajustado))
-r2_ajustado_sem_outliers <- 1 - (1 - r2_sem_outliers) * (n_sem_outliers - 1) / (n_sem_outliers - p_sem_outliers - 1)
-
-# Cálculo do AIC para o modelo sem outliers
-aic_sem_outliers <- AIC(Schnute_ajustado)
+# Indicadores do modelo ajustado
+metrics_schnute_ajustado <- calculate_model_metrics(modelo_schnute_ajustado, dados_schnute_sem_outliers, "Schnute")
+r2_sem_outliers <- metrics_schnute_ajustado$R_squared
+r2_ajustado_sem_outliers <- metrics_schnute_ajustado$Adjusted_R_squared
+aic_sem_outliers <- metrics_schnute_ajustado$AIC
 
 cat("Indicadores do Modelo Schnute (Sem Outliers):\n")
 cat("Coeficiente de Determinação (R²): ", r2_sem_outliers, "\n")
 cat("Coeficiente de Determinação Ajustado (R² Ajustado): ", r2_ajustado_sem_outliers, "\n")
 cat("Critério de Informação de Akaike (AIC): ", aic_sem_outliers, "\n\n")
 
-# Cálculo do RMSE (Root Mean Square Error)
-rmse <- sqrt(mean(residuals(Schnute_ajustado)^2))
+rmse <- sqrt(mean(residuals(modelo_schnute_ajustado)^2))
 cat("Root Mean Square Error (RMSE): ", rmse, "\n")
 
-# Adicionando colunas de predições para os conjuntos de dados
-dados_floresta$Predicao_Com_Outliers <- predict(Schnute, newdata = dados_floresta)
-dados_sem_outliers$Predicao_Sem_Outliers <- predict(Schnute_ajustado, newdata = dados_sem_outliers)
+# Adicionando colunas de predições
+dados_floresta$Predicao_Com_Outliers <- predict(modelo_schnute, newdata = dados_floresta)
+dados_schnute_sem_outliers$Predicao_Sem_Outliers <- predict(modelo_schnute_ajustado, newdata = dados_schnute_sem_outliers)
 
 # Visualização gráfica
 grafico_com_outliers <- ggplot(data = dados_floresta, aes(x = Age, y = AGB)) +
@@ -416,7 +384,7 @@ grafico_com_outliers <- ggplot(data = dados_floresta, aes(x = Age, y = AGB)) +
   ) +
   theme_minimal()
 
-grafico_sem_outliers <- ggplot(data = dados_sem_outliers, aes(x = Age, y = AGB)) +
+grafico_sem_outliers <- ggplot(data = dados_schnute_sem_outliers, aes(x = Age, y = AGB)) +
   geom_point(color = "green", size = 2) +
   geom_line(aes(y = Predicao_Sem_Outliers), color = "black") +
   labs(
@@ -429,8 +397,8 @@ grafico_sem_outliers <- ggplot(data = dados_sem_outliers, aes(x = Age, y = AGB))
 grafico_comparativo <- ggplot() +
   geom_point(data = dados_floresta, aes(x = Age, y = AGB, color = "Com Outliers"), size = 2) +
   geom_line(data = dados_floresta, aes(x = Age, y = Predicao_Com_Outliers, color = "Com Outliers")) +
-  geom_point(data = dados_sem_outliers, aes(x = Age, y = AGB, color = "Sem Outliers"), size = 2) +
-  geom_line(data = dados_sem_outliers, aes(x = Age, y = Predicao_Sem_Outliers, color = "Sem Outliers"), linetype = "dashed") +
+  geom_point(data = dados_schnute_sem_outliers, aes(x = Age, y = AGB, color = "Sem Outliers"), size = 2) +
+  geom_line(data = dados_schnute_sem_outliers, aes(x = Age, y = Predicao_Sem_Outliers, color = "Sem Outliers"), linetype = "dashed") +
   labs(
     title = "Modelo Schnute: Comparação Com e Sem Outliers",
     x = "Idade do Plantio (Anos)",
@@ -446,7 +414,7 @@ print(grafico_sem_outliers)
 print(grafico_comparativo)
 
 # Salvamento dos dados e modelos
-write.csv(dados_sem_outliers, file.path(derived_dir, "dados_sem_outliers_schnute.csv"))
+write.csv(dados_schnute_sem_outliers, file.path(derived_dir, "dados_sem_outliers_schnute.csv"))
 
 
 ############################
@@ -454,113 +422,61 @@ write.csv(dados_sem_outliers, file.path(derived_dir, "dados_sem_outliers_schnute
 ############################
 
 # Ajuste inicial do modelo Gompertz
-# Modelo não-linear para a relação entre AGB e Age
-Gompertz <- nls(
-  AGB ~ BETA * exp(-exp(-A * (Age - THETA))),
-  data = dados_floresta,
-  start = list(BETA = 9.2, A = 0.19, THETA = 2.9),
-  algorithm = "port"
-)
+gompertz_result <- run_regression_analysis(dados_floresta, AGB ~ Age, "Gompertz_Initial")
+modelo_gompertz <- gompertz_result$model
 
-# Cálculo do coeficiente de determinação (R²) para o modelo inicial
-predicoes <- predict(Gompertz, newdata = dados_floresta)
-residuos <- dados_floresta$AGB - predicoes
-soma_quadrados_residuos <- sum(residuos^2, na.rm = TRUE)
-soma_quadrados_total <- sum((dados_floresta$AGB - mean(dados_floresta$AGB, na.rm = TRUE))^2, na.rm = TRUE)
-r2_original <- 1 - (soma_quadrados_residuos / soma_quadrados_total)
+# Indicadores do modelo inicial
+metrics_gompertz_inicial <- calculate_model_metrics(modelo_gompertz, dados_floresta, "Gompertz")
+r2_original <- metrics_gompertz_inicial$R_squared
+r2_ajustado_original <- metrics_gompertz_inicial$Adjusted_R_squared
+aic_original <- metrics_gompertz_inicial$AIC
 
 cat("Indicadores do Modelo Gompertz (Com Outliers):\n")
 cat("Coeficiente de Determinação (R²): ", r2_original, "\n")
-
-# Cálculo do coeficiente de determinação ajustado (R² Ajustado)
-n <- nrow(dados_floresta)
-p <- length(coef(Gompertz))
-r2_ajustado_original <- 1 - (1 - r2_original) * (n - 1) / (n - p - 1)
 cat("Coeficiente de Determinação Ajustado (R² Ajustado): ", r2_ajustado_original, "\n")
-
-# Cálculo do Critério de Informação de Akaike (AIC)
-aic_original <- AIC(Gompertz)
 cat("Critério de Informação de Akaike (AIC): ", aic_original, "\n\n")
 
-# Cálculo do RMSE (Root Mean Square Error)
-rmse <- sqrt(mean(residuals(Gompertz)^2))
+rmse <- sqrt(mean(residuals(modelo_gompertz)^2))
 cat("Root Mean Square Error (RMSE): ", rmse, "\n")
 
-# Gráficos diagnósticos do modelo inicial
-par(mfrow = c(2, 2))
-plot(Gompertz)
-par(mfrow = c(1, 1))
-
-# Identificação de outliers com base nos resíduos padronizados
-residuos_padronizados <- residuos / sd(residuos, na.rm = TRUE)
-outliers_identificados <- which(abs(residuos_padronizados) > 2)
-
+# Identificação de outliers
+outliers_identificados <- gompertz_result$diagnostics$possible_outliers
 cat("Índices dos Outliers Identificados:\n")
 print(outliers_identificados)
-
 cat("Dados Correspondentes aos Outliers:\n")
 print(dados_floresta[outliers_identificados, ])
 
-# Gráfico de resíduos padronizados para visualização
-plot(
-  residuos_padronizados,
-  main = "Resíduos Padronizados",
-  xlab = "Índice",
-  ylab = "Resíduo Padronizado",
-  pch = 1,
-  col = "blue"
-)
-abline(h = c(-2, 2), col = "red", lty = 2)  # Limites de identificação de outliers
+# Remoção de outliers e novo ajuste
+dados_gompertz_sem_outliers <- dados_floresta
+if (length(outliers_identificados) > 0) {
+  dados_gompertz_sem_outliers <- dados_floresta[-outliers_identificados, ]
+}
+gompertz_adjusted <- run_regression_analysis(dados_gompertz_sem_outliers, AGB ~ Age, "Gompertz_Adjusted")
+modelo_gompertz_ajustado <- gompertz_adjusted$model
 
-# Remoção de outliers do conjunto de dados
-dados_sem_outliers <- dados_floresta[-outliers_identificados, ]
-
-# Ajuste do modelo Gompertz sem os outliers
-# Utilizando valores iniciais ajustados
-BETA_inicial <- max(dados_sem_outliers$AGB, na.rm = TRUE)
-A_inicial <- 0.1  # Experimente outros valores, se necessário
-THETA_inicial <- mean(dados_sem_outliers$Age, na.rm = TRUE)
-
-Gompertz_sem_outliers <- nls(
-  AGB ~ BETA * exp(-exp(-A * (Age - THETA))),
-  data = dados_sem_outliers,
-  start = list(BETA = BETA_inicial, A = A_inicial, THETA = THETA_inicial),
-  algorithm = "port"
-)
-
-# Recalcular os indicadores do modelo sem outliers
-predicoes_sem_outliers <- predict(Gompertz_sem_outliers, newdata = dados_sem_outliers)
-residuos_sem_outliers <- dados_sem_outliers$AGB - predicoes_sem_outliers
-soma_quadrados_residuos_sem_outliers <- sum(residuos_sem_outliers^2, na.rm = TRUE)
-soma_quadrados_total_sem_outliers <- sum((dados_sem_outliers$AGB - mean(dados_sem_outliers$AGB, na.rm = TRUE))^2, na.rm = TRUE)
-r2_sem_outliers <- 1 - (soma_quadrados_residuos_sem_outliers / soma_quadrados_total_sem_outliers)
-
-# Cálculo do R² Ajustado para o modelo sem outliers
-n_sem_outliers <- nrow(dados_sem_outliers)
-p_sem_outliers <- length(coef(Gompertz_sem_outliers))
-r2_ajustado_sem_outliers <- 1 - (1 - r2_sem_outliers) * (n_sem_outliers - 1) / (n_sem_outliers - p_sem_outliers - 1)
-
-# Cálculo do AIC para o modelo sem outliers
-aic_sem_outliers <- AIC(Gompertz_sem_outliers)
+# Indicadores ajustados
+metrics_gompertz_ajustado <- calculate_model_metrics(modelo_gompertz_ajustado, dados_gompertz_sem_outliers, "Gompertz")
+r2_sem_outliers <- metrics_gompertz_ajustado$R_squared
+r2_ajustado_sem_outliers <- metrics_gompertz_ajustado$Adjusted_R_squared
+aic_sem_outliers <- metrics_gompertz_ajustado$AIC
 
 cat("Indicadores do Modelo Gompertz (Sem Outliers):\n")
 cat("Coeficiente de Determinação (R²): ", r2_sem_outliers, "\n")
 cat("Coeficiente de Determinação Ajustado (R² Ajustado): ", r2_ajustado_sem_outliers, "\n")
 cat("Critério de Informação de Akaike (AIC): ", aic_sem_outliers, "\n")
 
-# Cálculo do RMSE (Root Mean Square Error)
-rmse <- sqrt(mean(residuals(Gompertz_sem_outliers)^2))
+rmse <- sqrt(mean(residuals(modelo_gompertz_ajustado)^2))
 cat("Root Mean Square Error (RMSE): ", rmse, "\n")
 
 # Comparação gráfica: com e sem outliers
-dados_floresta$Predicao_Com_Outliers <- predict(Gompertz, newdata = dados_floresta)
-dados_sem_outliers$Predicao_Sem_Outliers <- predict(Gompertz_sem_outliers, newdata = dados_sem_outliers)
+dados_floresta$Predicao_Com_Outliers <- predict(modelo_gompertz, newdata = dados_floresta)
+dados_gompertz_sem_outliers$Predicao_Sem_Outliers <- predict(modelo_gompertz_ajustado, newdata = dados_gompertz_sem_outliers)
 
 grafico_comparativo <- ggplot() +
   geom_point(data = dados_floresta, aes(x = Age, y = AGB, color = "Com Outliers"), size = 2) +
   geom_line(data = dados_floresta, aes(x = Age, y = Predicao_Com_Outliers, color = "Com Outliers")) +
-  geom_point(data = dados_sem_outliers, aes(x = Age, y = AGB, color = "Sem Outliers"), size = 2) +
-  geom_line(data = dados_sem_outliers, aes(x = Age, y = Predicao_Sem_Outliers, color = "Sem Outliers"), linetype = "dashed") +
+  geom_point(data = dados_gompertz_sem_outliers, aes(x = Age, y = AGB, color = "Sem Outliers"), size = 2) +
+  geom_line(data = dados_gompertz_sem_outliers, aes(x = Age, y = Predicao_Sem_Outliers, color = "Sem Outliers"), linetype = "dashed") +
   labs(
     title = "Modelo Gompertz: Comparação Com e Sem Outliers",
     x = "Idade do Plantio (Anos)",
@@ -574,7 +490,7 @@ grafico_comparativo <- ggplot() +
 print(grafico_comparativo)
 
 # Salvamento dos dados ajustados e dos modelos
-write.csv(dados_sem_outliers, file.path(derived_dir, "dados_sem_outliers_gompertz.csv"))
+write.csv(dados_gompertz_sem_outliers, file.path(derived_dir, "dados_sem_outliers_gompertz.csv"))
 
 # Sequência de valores para prever
 age_grid <- seq(min(dados_floresta$Age, na.rm = TRUE), max(dados_floresta$Age, na.rm = TRUE), length.out = 100)
@@ -590,8 +506,8 @@ predictions_df$Multiple_Com_Outliers <- predict(
     Precipitation = mean(dados_floresta$Precipitation, na.rm = TRUE)
   )
 )
-predictions_df$Schnute_Com_Outliers <- predict(Schnute, newdata = predictions_df)
-predictions_df$Gompertz_Com_Outliers <- predict(Gompertz, newdata = predictions_df)
+predictions_df$Schnute_Com_Outliers <- predict(modelo_schnute, newdata = predictions_df)
+predictions_df$Gompertz_Com_Outliers <- predict(modelo_gompertz, newdata = predictions_df)
 
 # Previsões sem outliers
 predictions_df$Linear_Sem_Outliers <- predict(modelo_linear_simples_ajustado, newdata = predictions_df)
@@ -599,12 +515,12 @@ predictions_df$Multiple_Sem_Outliers <- predict(
   modelo_linear_multiplo_ajustado,
   newdata = data.frame(
     Age = age_grid,
-    Temperature = mean(dados_sem_outliers$Temperature, na.rm = TRUE),
-    Precipitation = mean(dados_sem_outliers$Precipitation, na.rm = TRUE)
+    Temperature = mean(dados_multiplo_sem_outliers$Temperature, na.rm = TRUE),
+    Precipitation = mean(dados_multiplo_sem_outliers$Precipitation, na.rm = TRUE)
   )
 )
-predictions_df$Schnute_Sem_Outliers <- predict(Schnute_ajustado, newdata = predictions_df)
-predictions_df$Gompertz_Sem_Outliers <- predict(Gompertz_sem_outliers, newdata = predictions_df)
+predictions_df$Schnute_Sem_Outliers <- predict(modelo_schnute_ajustado, newdata = predictions_df)
+predictions_df$Gompertz_Sem_Outliers <- predict(modelo_gompertz_ajustado, newdata = predictions_df)
 
 # Transformar para formato longo
 predictions_long <- predictions_df %>%
