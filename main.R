@@ -4,9 +4,6 @@
 source(file.path("R", "functions", "load_libraries.R"))
 load_libraries()
 
-# Build the unified dataset
-source(file.path("R", "build_data.R"))
-
 # Run regressions
 source(file.path("R", "perform_regressions.R"))
 

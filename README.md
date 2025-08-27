@@ -19,15 +19,14 @@ The analyses are written for R. The following R packages are required:
 ## Project Structure
 
 - `main.R` – orchestrates the workflow: loads libraries, builds the dataset, runs regressions and explores results.
-- `R/build_data.R` – combines raw data files into a unified table saved to `data/derived`.
 - `R/perform_regressions.R` – fits linear, multiple and non-linear (Gompertz and Schnute) models and produces diagnostics.
 - `R/result_analysis.R` – utilities for inspecting and plotting regression results.
-- `data/raw` – place raw input files such as `agb_parcela_results.csv` and `Database_Consolidado_Corrigido.xlsx`.
-- `data/derived` – generated datasets like `tabela_unificada.xlsx`.
+- `data/raw` – place raw input file`tabela_unificada.xlsx`.
+- `data/derived` – generated datasets.
 
 ## Usage
 
-1. Add the necessary raw data files to `data/raw/`.
+1. Add the necessary raw data file to `data/raw/`.
 2. Install the dependencies by sourcing the helper function:
 
    ```r

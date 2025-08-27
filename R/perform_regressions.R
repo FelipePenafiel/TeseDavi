@@ -7,7 +7,7 @@ raw_dir <- file.path("data", "raw")
 derived_dir <- file.path("data", "derived")
 
 # Carregando os dados da planilha Excel
-forest_data <- read_excel(file.path(derived_dir, "tabela_unificada.xlsx"), col_types = "text")
+forest_data <- read_excel(file.path(raw_dir, "tabela_unificada.xlsx"), col_types = "text")
 
 # Especificando quais colunas devem ser tratadas como numéricas
 numeric_columns <- c("AGB", "Age", "Temperature", "Precipitation")
