@@ -7,17 +7,9 @@ raw_dir <- file.path("data", "raw")
 derived_dir <- file.path("data", "derived")
 
 # Importação e preparação dos dados
-dados_floresta <- read_excel(file.path(derived_dir, "tabela_unificada.xlsx"), col_types = "text")
+source("R/functions/load_and_prepare_data.R")
+dados_floresta <- load_and_prepare_data(file.path(derived_dir, "tabela_unificada.xlsx"))
 dados_floresta_10 <- subset(dados_floresta, Age <= 10)
-
-# Conversão de colunas para valores numéricos
-colunas_numericas <- c("AGB", "Age", "Temperature", "Precipitation")
-dados_floresta[colunas_numericas] <- lapply(dados_floresta[colunas_numericas], function(coluna) {
-  as.numeric(gsub(",", ".", coluna))
-})
-
-# Substituição de valores ausentes (-9999) por NA
-dados_floresta[dados_floresta == -9999] <- NA
 
 ############################
 # REGRESSÃO LINEAR SIMPLES
